@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased text-slate-800 bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Vision Architecture - Traceability Matrix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: white !important; color: black !important; }
+            .print-shadow-none { box-shadow: none !important; border: 1px solid #e2e8f0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-200 pb-6">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">System Traceability Matrix</h1>
+                <p class="text-slate-500 mt-2 text-lg">Machine Vision Drone: YOLOv8n vs YOLOv8s</p>
+            </div>
+            <button onclick="window.print()" class="no-print mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow transition duration-200 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                </svg>
+                Print / Save as PDF
+            </button>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-10 print-shadow-none">
+            <h2 class="text-xl font-semibold mb-3 text-slate-800">Document Overview</h2>
+            <p class="text-slate-600 leading-relaxed">
+                This specification document traces the high-level product requirements (identifying a person, tracking them in unstructured environments, and performing obstacle avoidance) down through the software architecture and finally to the physical hardware constraints. It explicitly compares the lightweight <strong>YOLOv8n (Nano)</strong> model against the slightly heavier, more accurate <strong>YOLOv8s (Small)</strong> model running on a Raspberry Pi 5 paired with a Hailo-8L NPU.
+            </p>
+        </div>
+
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">1</span>
+                Product Requirements (Functional)
+            </h2>
+            <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-1/4">Feature</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200">YOLOv8n (Nano)</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200 bg-blue-50/50">YOLOv8s (Small) - <span class="text-blue-600 font-bold">Recommended</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Tracking Distance</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200"><span class="font-semibold text-slate-800">Short-Range (2–5m):</span> Loses the lock on a person if they walk too far away or become a small cluster of pixels.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-blue-50/20"><span class="font-semibold text-slate-800">Medium/Long-Range (5–15m+):</span> Maintains a solid lock on the identified person even at a distance.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Environmental Robustness</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200"><span class="text-amber-600 font-semibold">Low:</span> Struggles heavily with shadows, dusk, or partial occlusions (e.g., walking behind a tree branch).</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-blue-50/20"><span class="text-emerald-600 font-semibold">High:</span> Highly capable in natural, unlit outdoor environments due to its deeper mathematical network.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Tracking Reactivity</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200"><span class="font-semibold text-slate-800">Extremely Fast:</span> Hyper-reactive to sudden, jerky movements.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-blue-50/20"><span class="font-semibold text-slate-800">Fast:</span> Smooth and reliable, perfect for cinematic tracking or standard follow-me modes.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Palm Landing Accuracy</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Rapid response to sudden hand movements at close range.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-blue-50/20">Slower response to sudden jerks, but higher confidence in identifying a palm correctly.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold">2</span>
+                System Architecture & Software Specs
+            </h2>
+            <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-1/4">Specification</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200">YOLOv8n (Nano)</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200 bg-indigo-50/50">YOLOv8s (Small)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Mathematical Load</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">~8.7 Billion FLOPs per frame.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-indigo-50/20">~28.6 Billion FLOPs per frame.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Expected FPS (Hailo-8L)</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200"><span class="font-semibold text-slate-800">~120+ FPS:</span> Leaves massive overhead for the NPU.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-indigo-50/20"><span class="font-semibold text-slate-800">~60 to 80 FPS:</span> Maxes out NPU capabilities, well above the 30 FPS flight control threshold.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Flight Control Latency</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Near-zero latency. CPU has abundant free time to process obstacle detection.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-indigo-50/20">Slightly higher processing latency, but delivers MAVLink commands well within safe limits.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">RAM Requirement</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">4GB RAM is sufficient.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-indigo-50/20">4GB RAM is sufficient.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-bold">3</span>
+                Hardware Specifications & Physical Requirements
+            </h2>
+            <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-1/4">Hardware Component</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200">YOLOv8n (Nano)</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 uppercase tracking-wider w-3/8 border-l border-slate-200 bg-amber-50/50">YOLOv8s (Small)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Thermal Management (Pi 5)</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Standard active cooler required.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-amber-50/20">Standard active cooler required.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Thermal Management (NPU)</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Basic passive heatsink on the Hailo-8L chip is sufficient.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-amber-50/20"><span class="text-red-600 font-bold uppercase text-xs tracking-wider">Mandatory Active Cooling</span><br/>The Hailo-8L will run hot under continuous 28 GFLOP load. Must use a dedicated fan or position in propeller downwash.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Power Consumption</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">~7W to 8W total system draw.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-amber-50/20"><span class="font-bold text-slate-900">~10W to 12W</span> total system draw under continuous heavy inference.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Power Delivery (BEC)</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Standard 5V/3A BEC likely survives, though 5A is safer.</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-amber-50/20"><span class="text-red-600 font-bold uppercase text-xs tracking-wider">Strict Requirement</span><br/>Requires a high-quality <strong>5V/5A (25W) dedicated BEC</strong>. The NPU causes rapid power spikes. A weak BEC will cause voltage brownouts and mid-air crashes.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">Payload Weight</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200">Lighter (smaller heatsinks, standard power modules).</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 bg-amber-50/20">Slightly heavier (larger heatsinks/fans, heavy-duty power modules).</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="bg-blue-900 rounded-xl p-6 md:p-8 text-white shadow-lg mb-8 print-shadow-none">
+            <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Design Summary
+            </h3>
+            <p class="text-blue-100 leading-relaxed">
+                By choosing <strong>YOLOv8s</strong> to ensure the drone can robustly follow a locked person in natural environments, your software and RAM requirements remain virtually unchanged from the Nano model. However, your hardware requirements <strong>strictly increase</strong> regarding thermal cooling (adding fans/airflow) and power delivery (mandating a high-quality 5V/5A BEC). 
+            </p>
+        </div>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased text-slate-800 bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Processing Power Calculation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: white !important; color: black !important; }
+            .print-shadow-none { box-shadow: none !important; border: 1px solid #e2e8f0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-200 pb-6">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">Power Consumption Analysis</h1>
+                <p class="text-slate-500 mt-2 text-lg">Video Processing Stack & Flight Time Feasibility</p>
+            </div>
+            <button onclick="window.print()" class="no-print mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow transition duration-200 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                </svg>
+                Save as PDF
+            </button>
+        </header>
+
+        <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 print-shadow-none">
+            <h2 class="text-2xl font-bold mb-4 text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                1. Video Processing Power Calculation
+            </h2>
+            <p class="text-slate-600 mb-4 leading-relaxed">
+                To calculate the exact power draw of the video processing stack, we must measure the continuous load of each component during active AI inference, plus the thermal losses from the 5V BEC.
+            </p>
+
+            <h3 class="font-semibold text-slate-800 mb-3">Component Power Draw (During Active YOLOv8s Inference):</h3>
+            <div class="overflow-x-auto rounded-lg border border-slate-200 mb-6">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-700 w-1/2">Component</th>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-700 border-l border-slate-200">Power Draw</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">Raspberry Pi 5 (4GB)</td>
+                            <td class="px-4 py-3 text-slate-600 border-l border-slate-200">~6.0W average (spikes to 8.8W under full CPU load)</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">Hailo-8L NPU</td>
+                            <td class="px-4 py-3 text-slate-600 border-l border-slate-200">~1.5W to 3.0W (active continuous inference)</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">Camera Module 3 Wide</td>
+                            <td class="px-4 py-3 text-slate-600 border-l border-slate-200">~1.2W continuous</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">Active Cooler (Fan)</td>
+                            <td class="px-4 py-3 text-slate-600 border-l border-slate-200">~0.5W</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-medium text-slate-900">Wi-Fi Transmitter (Pi 5 Internal)</td>
+                            <td class="px-4 py-3 text-slate-600 border-l border-slate-200">~0.5W</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="bg-slate-100 border-t border-slate-200">
+                        <tr>
+                            <td class="px-4 py-3 font-bold text-slate-900">Total 5V System Draw</td>
+                            <td class="px-4 py-3 font-bold text-indigo-700 border-l border-slate-200">~9.7W to 11.2W <span class="text-slate-500 font-normal text-xs ml-1">(Conservative estimate: 11.0W)</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-2">
+                <h4 class="font-bold text-indigo-900 mb-2">Real Power Pulled from Battery</h4>
+                <p class="text-sm text-indigo-800 mb-2">Because the BEC stepping down the main battery voltage to 5V is only about 85% to 90% efficient, some power is lost as heat.</p>
+                <code class="block bg-white p-2 rounded border border-indigo-200 text-indigo-700 font-bold font-mono">11.0W / 0.85 efficiency = ~12.9 Watts continuous</code>
+                <p class="text-sm text-indigo-800 mt-2 font-medium">If your drone flies for 60 minutes (1 hour), the video processing side alone will consume ~12.9 Watt-hours (Wh) of battery capacity.</p>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">2. Engineering Audit & Flight Time Reality Check</h2>
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print-shadow-none mb-6">
+                <p class="text-slate-600 mb-4">
+                    The structural approach of separating the video power budget from the flight control power budget before merging them is standard, correct systems engineering. The logic regarding 95% continuous autonomous uptime accurately reflects how the Pi will load the battery.
+                </p>
+                
+                <div class="bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg mb-4">
+                    <h3 class="text-rose-800 font-bold mb-1">Reality Check: The 60-Minute Target</h3>
+                    <p class="text-sm text-rose-700">
+                        However, your target requirement of a 40 to 60 minute flight time on a DIY quadcopter needs a serious reality check.
+                    </p>
+                    <ul class="list-disc pl-5 mt-2 space-y-1 text-sm text-rose-700">
+                        <li>A standard DIY 5-inch, 7-inch, or 10-inch quadcopter carrying a ~150g companion computer payload typically achieves <strong>15 to 25 minutes</strong> of flight time on standard LiPo batteries.</li>
+                        <li>Achieving 40 to 60 minutes crosses over into <strong>"Endurance Drone"</strong> territory. It is physically impossible to achieve this with standard racing/freestyle quadcopter parts.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Endurance Architecture Shifts Required</h3>
+            <p class="text-slate-600 mb-4">To hit a 60-minute flight time while carrying a Raspberry Pi 5, the flight control and mechanical side of your system architecture must drastically shift:</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm print-shadow-none">
+                    <h4 class="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-2">Massive Propellers</h4>
+                    <p class="text-sm text-slate-600">You will need 12-inch to 15-inch propellers spinning very slowly to maximize aerodynamic thrust efficiency.</p>
+                </div>
+                
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm print-shadow-none">
+                    <h4 class="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-2">Low-KV Motors</h4>
+                    <p class="text-sm text-slate-600">Standard motors (1500KV - 2500KV) burn too much energy. You will need large, pancake-style endurance motors (400KV - 600KV).</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm print-shadow-none">
+                    <h4 class="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-2">Li-Ion vs. LiPo</h4>
+                    <p class="text-sm text-slate-600">Standard LiPo batteries are too heavy for their energy density. You will likely need to build or buy a custom Lithium-Ion pack (e.g., a 6S4P pack made of 21700 cells) to get the required Watt-hours without grounding the drone.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 p-4 bg-slate-900 rounded-lg text-center print-shadow-none">
+                <p class="text-slate-300 font-medium">Conclusion: Your video processing power calculation is solid, but the flight control math is going to dictate the physical size of this entire project.</p>
+            </div>
+        </section>
+
+    </div>
+</body>
+</html>

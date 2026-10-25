@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased text-slate-800 bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Loop & ML Model Sizing Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: white !important; color: black !important; }
+            .print-shadow-none { box-shadow: none !important; border: 1px solid #e2e8f0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-200 pb-6">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">Multi-Rate Control System Analysis</h1>
+                <p class="text-slate-500 mt-2 text-lg">Vision FPS vs. Flight Controller Frequency & ML Model Sizing</p>
+            </div>
+            <button onclick="window.print()" class="no-print mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow transition duration-200 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
+                </svg>
+                Save as PDF
+            </button>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 print-shadow-none">
+            <h2 class="text-xl font-semibold mb-3 text-slate-800">1. System Frequency Discrepancy</h2>
+            <p class="text-slate-600 leading-relaxed mb-4">
+                In a typical autonomous drone architecture, the companion computer (vision system) and the flight controller operate at different frequencies. For instance, an optimized vision pipeline might output target coordinates at <strong>85 FPS</strong>, while the flight controller's position estimation/MAVLink intake loop processes inputs at <strong>30 to 50 Hz</strong>. 
+            </p>
+            <p class="text-slate-600 leading-relaxed">
+                Consequently, 35 to 55 vision updates per second are technically skipped or overwritten. Flight controller firmware (e.g., ArduPilot, PX4) reads incoming serial messages on a fixed scheduler. If 85 messages are pushed into the serial buffer in one second, the flight controller's Extended Kalman Filter (EKF) will simply grab the most recent message available when its 30Hz or 50Hz timer triggers, discarding older unread messages.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <h3 class="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                    Mechanical Inertia Limits
+                </h3>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    The control rate bottleneck naturally shifts to the flight controller's navigation loop. This is a desirable limitation. A physical drone (frame, ESCs, motors, propellers) cannot dynamically react to changes in direction faster than 30 to 50 times a second. Updating position commands faster than 50 Hz yields diminishing returns due to physical inertia.
+                </p>
+            </div>
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <h3 class="text-lg font-semibold mb-3 text-slate-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    Multi-Loop Architecture
+                </h3>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    Flight controllers utilize a cascaded loop structure: <br><br>
+                    <strong>Inner Loop (Rate/Gyro):</strong> Runs at 1,000–8,000 Hz, updating motor speeds for stabilization. <br>
+                    <strong>Outer Loop (Navigation):</strong> Runs at 30–100 Hz. The companion computer injects vision data here, dictating desired trajectory, which is passed to the inner loop.
+                </p>
+            </div>
+        </div>
+
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">2. Advantages of an Over-Frequency Vision Pipeline</h2>
+            <p class="text-slate-600 mb-6">Even though intermediate frames are dropped, maintaining a vision processing pipeline significantly faster than the flight controller's polling rate (e.g., 85 FPS vs 50 Hz) provides critical functional advantages.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                    <h4 class="font-bold text-blue-900 mb-2">Advantage A: Maximum Data Freshness</h4>
+                    <p class="text-sm text-blue-800 leading-relaxed">
+                        When the FC reaches into the buffer at a 50 Hz interval (every 20ms):
+                        <ul class="list-disc pl-5 mt-2 space-y-1">
+                            <li>At <strong>30 FPS</strong> vision, the newest frame may be up to 33ms old.</li>
+                            <li>At <strong>85 FPS</strong> vision, the newest frame is a maximum of 11.7ms old.</li>
+                        </ul>
+                        <br>
+                        This ensures the FC receives the freshest data possible, minimizing phase lag and preventing trajectory overshoot during high-speed tracking.
+                    </p>
+                </div>
+                
+                <div class="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
+                    <h4 class="font-bold text-emerald-900 mb-2">Advantage B: Temporal Filtering</h4>
+                    <p class="text-sm text-emerald-800 leading-relaxed">
+                        Generating data at 85 FPS provides the companion computer with excess data points. This allows for lightweight temporal filtering (such as a Kalman Filter or Moving Average) directly on the bounding box coordinates before transmission. Anomalous frames resulting from motion blur or momentary false detections can be mathematically smoothed out prior to FC intake.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-10">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">3. Buffer Margins and System Jitter</h2>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 print-shadow-none overflow-hidden">
+                <div class="p-6">
+                    <p class="text-slate-600 mb-4">
+                        To guarantee reliable drone performance, control systems engineering dictates that the sensor update rate (Vision FPS) should ideally be <strong>1.5x to 2.0x</strong> the frequency of the flight controller's navigation loop.
+                    </p>
+                    <ul class="space-y-3 text-slate-700 mb-6">
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-400"></span> <strong>FC at 30 Hz:</strong> Target vision output of 45 to 60 FPS.</li>
+                        <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-400"></span> <strong>FC at 50 Hz:</strong> Target vision output of 75 to 100 FPS.</li>
+                    </ul>
+                    
+                    <h4 class="font-semibold text-slate-800 mt-6 mb-2">Overcoming Operating System Jitter</h4>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-4">
+                        A standard Linux OS is not a strict real-time system. Frame processing times will fluctuate (jitter). A 1.5x buffer ensures that if a single frame takes longer than average due to background CPU tasks, the flight controller is never starved of new data.
+                    </p>
+                    
+                    <h4 class="font-semibold text-slate-800 mt-6 mb-2">The Danger of a 1:1 Ratio</h4>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        The absolute minimum acceptable ratio is 1:1. However, this offers zero buffer margin. If a single frame is dropped or delayed, the flight controller will poll an empty buffer and reuse stale coordinate data, resulting in physical micro-stuttering during flight. A safe, practical minimum is to maintain at least +15 FPS above the FC frequency. For example, a <strong>70 FPS</strong> vision system feeding a <strong>50 Hz</strong> FC yields a <strong>1.4x ratio</strong>, which is a highly reliable boundary.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">4. YOLOv8 Model Sizing Constraints</h2>
+            <p class="text-slate-600 mb-4">
+                Attempting to match the vision system's FPS perfectly to the flight controller's frequency by deliberately selecting a heavier, slower Machine Learning model destroys the necessary safety buffer. The YOLOv8 architecture scales significantly, and moving to heavier models drastically increases the computational load beyond the capabilities of edge hardware.
+            </p>
+            
+            <div class="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-200 print-shadow-none">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 tracking-wider">Model Name</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 tracking-wider">Scale</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 tracking-wider">Parameters</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 tracking-wider">Compute Load</th>
+                            <th class="px-6 py-4 text-left font-semibold text-slate-700 tracking-wider border-l border-slate-200">Hardware Use Case Context</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">YOLOv8n</td>
+                            <td class="px-6 py-4 text-slate-600">Nano</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">3.2 M</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">8.7 GFLOPs</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 text-xs">Edge devices, basic SBCs, extreme high-speed tasks.</td>
+                        </tr>
+                        <tr class="bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-blue-900">YOLOv8s</td>
+                            <td class="px-6 py-4 text-blue-800">Small</td>
+                            <td class="px-6 py-4 text-blue-800 font-mono">11.2 M</td>
+                            <td class="px-6 py-4 text-blue-800 font-mono">28.6 GFLOPs</td>
+                            <td class="px-6 py-4 text-blue-800 border-l border-blue-100 text-xs font-semibold">Recommended for Advanced Edge AI (e.g., Pi 5 + Hailo-8L). Optimal balance of speed and accuracy.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">YOLOv8m</td>
+                            <td class="px-6 py-4 text-slate-600">Medium</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">25.9 M</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">78.9 GFLOPs</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 text-xs">Entry-level desktop GPUs, high-end robotics platforms (e.g., Jetson Orin).</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">YOLOv8l</td>
+                            <td class="px-6 py-4 text-slate-600">Large</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">43.7 M</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">165.2 GFLOPs</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 text-xs">Desktop GPUs for highly accurate static security cameras.</td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-slate-900">YOLOv8x</td>
+                            <td class="px-6 py-4 text-slate-600">Extra Large</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">68.2 M</td>
+                            <td class="px-6 py-4 text-slate-600 font-mono">257.8 GFLOPs</td>
+                            <td class="px-6 py-4 text-slate-600 border-l border-slate-200 text-xs">Cloud computing servers and high-end AI research.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-sm text-slate-500 mt-4 italic">Note: Moving from the Small (s) to the Medium (m) model more than doubles the parameters and nearly triples the mathematical load. Running YOLOv8m on an edge configuration would cause frame rates to crash below standard FC 50 Hz thresholds, breaking the control loop.</p>
+        </section>
+
+    </div>
+</body>
+</html>
