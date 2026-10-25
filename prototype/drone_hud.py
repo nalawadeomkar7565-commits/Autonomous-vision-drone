@@ -1,23 +1,47 @@
 #Author: Omkar Nalawade
-#Date: 26th September 2026
+#Date: 01st October 2026
 #Description:   Input and output pipeline for the Gstreamer and OpenCV to work together. 
 #               And at the end overlay HUD information and stream it via RTSP.
 
-
-#Update:                
-#Update description:                     
+#Update:                Rev.A to Rev.B
+#Update description:    Change in the captured video aspect ratio - 640x480 to 1024x576
+#                       Output to RTSP bitrate change - 500 to 2000
+#                       Adding variables
 
 #-----------------------------------------------------------------------------------
 
 import cv2
 
-# 1. Input: Capture the camera feed using the Pi's native libcamera system
-cap_pipeline = "libcamerasrc ! video/x-raw, width=640, height=480, framerate=30/1, format=RGB ! videoconvert ! appsink"
+WIDTH = 1024
+HEIGHT = 576
+FPS = 30
+BITRATE = 1500
+IS_COLOUR = True
+
+# 1. Input: Let libcamera capture natively, then scale and convert to OpenCV's native BGR format
+cap_pipeline = (
+    f"libcamerasrc ! "
+    f"videoconvert ! "
+    f"videoscale ! "
+    f"video/x-raw, width={WIDTH}, height={HEIGHT}, framerate={FPS}/1, format=BGR ! "
+    f"appsink drop=true sync=false"
+)
 cap = cv2.VideoCapture(cap_pipeline, cv2.CAP_GSTREAMER)
 
-# 2. Output: Encode the frames and push them to your MediaMTX server
-out_pipeline = "appsrc ! videoconvert ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtspclientsink location=rtsp://127.0.0.1:8554/drone"
-out = cv2.VideoWriter(out_pipeline, cv2.CAP_GSTREAMER, 0, 30.0, (640, 480), True)
+# 2. Output: Added explicit Keyframe limits and disabled B-frames for zero-latency recovery
+out_pipeline = (
+    f"appsrc ! "
+    f"videoconvert ! "
+    f"video/x-raw, format=I420 ! "
+    f"x264enc tune=zerolatency bitrate={BITRATE} speed-preset=superfast key-int-max={FPS} bframes=0 ! "
+    f"rtspclientsink location=rtsp://127.0.0.1:8554/drone protocols=tcp"
+)
+
+out = cv2.VideoWriter(out_pipeline, cv2.CAP_GSTREAMER, 0, float(FPS), (WIDTH, HEIGHT), IS_COLOUR)
+
+if not out.isOpened():
+    print("FATAL: Output pipeline failed to open!")
+    exit()
 
 print("HUD Pipeline Active. Streaming to rtsp://dronepi.local:8554/drone")
 
