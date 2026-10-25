@@ -1,22 +1,29 @@
 #Author: Omkar Nalawade
-#Date: 01st October 2026
-#Description:   Input and output pipeline for the Gstreamer and OpenCV to work together. 
-#               And at the end overlay HUD information and stream it via RTSP.
+#Date: 03rd October 2026
+#Description:   Input and output pipeline for the Gstreamer and OpenCV to work together.
+#               AI Injection after reading the frame. Parsing of the YOLOv8s results and passing
+#               it to OpenCV for sensible overlay.  
+#               And at the end, overlay HUD telemetry information and stream it via RTSP.
 
-#Update:                Rev.A to Rev.B
-#Update description:    Change in the captured video aspect ratio - 640x480 to 1024x576
-#                       Output to RTSP bitrate change - 500 to 2000
-#                       Adding variables
+#Update:                C001_Rev.B to C002_Rev.B
+#Update description:    AI Injection after reading the frame. Parsing of the YOLOv8s results and passing
+#                       it to OpenCV for sensible overlay.
 
 #-----------------------------------------------------------------------------------
 
 import cv2
+from ultralytics import YOLO
 
 WIDTH = 1024
 HEIGHT = 576
 FPS = 30
 BITRATE = 1500
 IS_COLOUR = True
+conf_limit = 0.60
+
+# Setting up the YOLOv8s model:
+
+model = YOLO("yolov8s.pt")
 
 # 1. Input: Let libcamera capture natively, then scale and convert to OpenCV's native BGR format
 cap_pipeline = (
@@ -46,10 +53,44 @@ if not out.isOpened():
 print("HUD Pipeline Active. Streaming to rtsp://dronepi.local:8554/drone")
 
 while True:
-    ret, frame = cap.read()
-    if not ret:
+    ret, frame = cap.read() # reading the frame and returning it to "frame". Return is false if it was unable to read. 
+    if not ret: 
         print("Failed to grab frame")
         break
+    
+    # 1. AI INJECTION
+    # verbose=False stops the AI from printing text to your terminal every single frame
+    results = model(frame, verbose=False)
+    
+    # Initialize a counter to track how many people are in this specific frame
+    person_counter = 1 
+
+    # 2. EXTRACTION
+    for r in results:
+        boxes = r.boxes  # Extract the bounding box data from the AI's results
+        for box in boxes:
+            # Extract the Class ID and Confidence Score
+            cls_id = int(box.cls[0]) 
+            conf = float(box.conf[0])
+            
+            # YOLO Class 0 is 'person'. We only proceed if it's a person AND confidence is > the conf_limit
+            if cls_id == 0 and conf > conf_limit:
+                
+                # Extract the 4 pixel coordinates and convert them to standard integers
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                
+                # 3. DYNAMIC OVERLAY
+                # Draw the bounding box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                
+                # Create the dynamic text (e.g., "Person 1", "Person 2")
+                label = f"Person {person_counter}"
+                
+                # Place the text slightly above the top-left corner of the box
+                cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                
+                # Increment the counter for the next person found in the frame
+                person_counter += 1
 
     # --- HUD OVERLAY LOGIC ---
     height, width, _ = frame.shape
