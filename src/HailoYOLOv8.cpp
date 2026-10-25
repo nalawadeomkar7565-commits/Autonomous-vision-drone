@@ -25,7 +25,6 @@ HailoYOLOv8::HailoYOLOv8(const std::string& hef_path) {
     m_net_w = shape.width;
     m_input_frame_size = m_infer_model->input()->get_frame_size();
 
-    // Pre-allocate persistent RAM buffers once during startup
     m_input_buffer.resize(m_input_frame_size);
     size_t output_size = m_infer_model->output()->get_frame_size();
     m_output_buffer.resize(output_size);
@@ -41,9 +40,7 @@ HailoYOLOv8::HailoYOLOv8(const std::string& hef_path) {
 
 HailoYOLOv8::~HailoYOLOv8() {}
 
-// Returns immediately. Does not freeze the CPU.
 void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
-    // 1. Zero-Latency Drop: If NPU is busy, discard this frame instantly
     if (m_is_processing.load()) {
         return; 
     }
@@ -52,63 +49,41 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
     int orig_w = frame.cols;
     int orig_h = frame.rows;
 
-    // --- PROPORTIONAL LETTERBOXING LOGIC ---
-    // Calculate aspect-ratio preserving scale factor
-    float scale = std::min(static_cast<float>(m_net_w) / orig_w, static_cast<float>(m_net_h) / orig_h);
-    int new_w = static_cast<int>(std::round(orig_w * scale));
-    int new_h = static_cast<int>(std::round(orig_h * scale));
-
-    // Calculate padding required to reach 640x640 canvas
-    int pad_w = (m_net_w - new_w) / 2;
-    int pad_h = (m_net_h - new_h) / 2;
-
-    // Resize camera frame proportionally
+    // --- BGR SQUISH EXPERIMENT LOGIC ---
+    // 1. Squish the 16:9 frame directly into the 1:1 NPU resolution (No padding)
     cv::Mat resized_frame;
-    cv::resize(frame, resized_frame, cv::Size(new_w, new_h));
+    cv::resize(frame, resized_frame, cv::Size(m_net_w, m_net_h));
 
-    // Create 640x640 canvas pre-filled with neutral YOLO gray (114, 114, 114)
-    cv::Mat letterboxed(m_net_h, m_net_w, CV_8UC3, cv::Scalar(114, 114, 114));
-    resized_frame.copyTo(letterboxed(cv::Rect(pad_w, pad_h, new_w, new_h)));
-
-    cv::Mat rgb_frame;
-    cv::cvtColor(letterboxed, rgb_frame, cv::COLOR_BGR2RGB);
-
-    // Copy to persistent class buffer to prevent destruction
-    std::memcpy(m_input_buffer.data(), rgb_frame.data, m_input_frame_size);
+    // 2. Skip RGB conversion (Force the NPU to be color-blind like the Python script)
+    // We copy the raw BGR data directly into the input buffer
+    std::memcpy(m_input_buffer.data(), resized_frame.data, m_input_frame_size);
 
     m_bindings.input()->set_buffer(MemoryView(m_input_buffer.data(), m_input_frame_size));
     m_bindings.output()->set_buffer(MemoryView(m_output_buffer.data(), m_output_buffer.size()));
 
-    // 2. Push to NPU and define the background callback
     auto status = m_configured_model.wait_for_async_ready(std::chrono::milliseconds(0));
     if (status == HAILO_SUCCESS) {
         
-        m_configured_model.run_async(m_bindings, [this, orig_w, orig_h, pad_w, pad_h, scale, conf_threshold](const AsyncInferCompletionInfo& info) {
+        m_configured_model.run_async(m_bindings, [this, orig_w, orig_h, conf_threshold](const AsyncInferCompletionInfo& info) {
             
             size_t output_size = m_output_buffer.size();
             float* raw_data = reinterpret_cast<float*>(m_output_buffer.data());
             size_t num_detections = output_size / (6 * sizeof(float));
             
             std::vector<DetectionBox> temp_detections;
-            // Hailo NMS output structure: [ymin, xmin, ymax, xmax, conf, class_id]
+            
             for (size_t i = 0; i < num_detections; ++i) {
                 float conf = raw_data[i * 6 + 4];
                 int class_id = static_cast<int>(raw_data[i * 6 + 5]);
 
                 if (conf >= conf_threshold && class_id == 0) {
-                    // Convert normalized NPU outputs back to 640x640 canvas pixel coordinates
-                    float ymin_canvas = raw_data[i * 6 + 0] * m_net_h;
-                    float xmin_canvas = raw_data[i * 6 + 1] * m_net_w;
-                    float ymax_canvas = raw_data[i * 6 + 2] * m_net_h;
-                    float xmax_canvas = raw_data[i * 6 + 3] * m_net_w;
+                    // Because we uniformly squished the image, we can multiply the normalized 
+                    // NPU tensor outputs directly against the original 1024x576 dimensions.
+                    int x1 = static_cast<int>(std::round(raw_data[i * 6 + 1] * orig_w));
+                    int y1 = static_cast<int>(std::round(raw_data[i * 6 + 0] * orig_h));
+                    int x2 = static_cast<int>(std::round(raw_data[i * 6 + 3] * orig_w));
+                    int y2 = static_cast<int>(std::round(raw_data[i * 6 + 2] * orig_h));
 
-                    // Reverse padding offsets and unscale back to original 1024x576 frame space
-                    int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
-                    int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
-                    int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
-                    int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
-
-                    // Clamp coordinates to original image bounds
                     DetectionBox box;
                     box.x1 = std::max(0, std::min(x1, orig_w - 1));
                     box.y1 = std::max(0, std::min(y1, orig_h - 1));
@@ -120,21 +95,18 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
                 }
             }
 
-            // 3. Lock memory and update the shared state
             {
                 std::lock_guard<std::mutex> lock(m_detection_mutex);
                 m_latest_detections = std::move(temp_detections);
             }
 
-            // 4. Free the NPU for the next frame
             m_is_processing.store(false);
         });
     } else {
-        m_is_processing.store(false); // Failsafe release
+        m_is_processing.store(false);
     }
 }
 
-// Allows the main loop to grab the newest targets without waiting
 std::vector<DetectionBox> HailoYOLOv8::get_latest_detections() {
     std::lock_guard<std::mutex> lock(m_detection_mutex);
     return m_latest_detections;
