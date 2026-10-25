@@ -1,7 +1,9 @@
-// Version: Rev.B
+// Version: Rev.C
 
 #include "HailoYOLOv8.hpp"
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 
 using namespace hailort;
 
@@ -50,9 +52,26 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
     int orig_w = frame.cols;
     int orig_h = frame.rows;
 
-    cv::Mat resized_frame, rgb_frame;
-    cv::resize(frame, resized_frame, cv::Size(m_net_w, m_net_h));
-    cv::cvtColor(resized_frame, rgb_frame, cv::COLOR_BGR2RGB);
+    // --- PROPORTIONAL LETTERBOXING LOGIC ---
+    // Calculate aspect-ratio preserving scale factor
+    float scale = std::min(static_cast<float>(m_net_w) / orig_w, static_cast<float>(m_net_h) / orig_h);
+    int new_w = static_cast<int>(std::round(orig_w * scale));
+    int new_h = static_cast<int>(std::round(orig_h * scale));
+
+    // Calculate padding required to reach 640x640 canvas
+    int pad_w = (m_net_w - new_w) / 2;
+    int pad_h = (m_net_h - new_h) / 2;
+
+    // Resize camera frame proportionally
+    cv::Mat resized_frame;
+    cv::resize(frame, resized_frame, cv::Size(new_w, new_h));
+
+    // Create 640x640 canvas pre-filled with neutral YOLO gray (114, 114, 114)
+    cv::Mat letterboxed(m_net_h, m_net_w, CV_8UC3, cv::Scalar(114, 114, 114));
+    resized_frame.copyTo(letterboxed(cv::Rect(pad_w, pad_h, new_w, new_h)));
+
+    cv::Mat rgb_frame;
+    cv::cvtColor(letterboxed, rgb_frame, cv::COLOR_BGR2RGB);
 
     // Copy to persistent class buffer to prevent destruction
     std::memcpy(m_input_buffer.data(), rgb_frame.data, m_input_frame_size);
@@ -64,8 +83,7 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
     auto status = m_configured_model.wait_for_async_ready(std::chrono::milliseconds(0));
     if (status == HAILO_SUCCESS) {
         
-        // The lambda function [this, ...] captures class variables to use in the background
-        m_configured_model.run(m_bindings, [this, orig_w, orig_h, conf_threshold](const AsyncInferCompletionInfo& info) {
+        m_configured_model.run_async(m_bindings, [this, orig_w, orig_h, pad_w, pad_h, scale, conf_threshold](const AsyncInferCompletionInfo& info) {
             
             size_t output_size = m_output_buffer.size();
             float* raw_data = reinterpret_cast<float*>(m_output_buffer.data());
@@ -78,11 +96,24 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
                 int class_id = static_cast<int>(raw_data[i * 6 + 5]);
 
                 if (conf >= conf_threshold && class_id == 0) {
+                    // Convert normalized NPU outputs back to 640x640 canvas pixel coordinates
+                    float ymin_canvas = raw_data[i * 6 + 0] * m_net_h;
+                    float xmin_canvas = raw_data[i * 6 + 1] * m_net_w;
+                    float ymax_canvas = raw_data[i * 6 + 2] * m_net_h;
+                    float xmax_canvas = raw_data[i * 6 + 3] * m_net_w;
+
+                    // Reverse padding offsets and unscale back to original 1024x576 frame space
+                    int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
+                    int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
+                    int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
+                    int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
+
+                    // Clamp coordinates to original image bounds
                     DetectionBox box;
-                    box.x1 = static_cast<int>(raw_data[i * 6 + 1] * orig_w);
-                    box.y1 = static_cast<int>(raw_data[i * 6 + 0] * orig_h);
-                    box.x2 = static_cast<int>(raw_data[i * 6 + 3] * orig_w);
-                    box.y2 = static_cast<int>(raw_data[i * 6 + 2] * orig_h);
+                    box.x1 = std::max(0, std::min(x1, orig_w - 1));
+                    box.y1 = std::max(0, std::min(y1, orig_h - 1));
+                    box.x2 = std::max(0, std::min(x2, orig_w - 1));
+                    box.y2 = std::max(0, std::min(y2, orig_h - 1));
                     box.confidence = conf;
                     box.class_id = class_id;
                     temp_detections.push_back(box);
