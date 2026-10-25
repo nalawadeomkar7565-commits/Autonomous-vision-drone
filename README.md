@@ -23,7 +23,7 @@ The payload is built around a first-principles approach to hardware acceleration
 * **Vision Sensor:** IMX708 Wide Camera Module
 * **Streaming Protocol:** MediaMTX for low-latency RTSP video streaming
 
-![System Architecture Diagram](docs/TDP_System_Architechture_C001_Rev.B.png)
+![System Architecture Diagram](docs/TDP_System_Architecture_C001_Rev.B.png)
 
 ## Software Stack & Pipeline
 
