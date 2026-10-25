@@ -1,4 +1,5 @@
-// Version: Rev.C
+// Version: Rev.D
+
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include "HailoYOLOv8.hpp"

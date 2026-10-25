@@ -1,4 +1,4 @@
-// Version: Rev.C
+// Version: Rev.D
 
 #include "HailoYOLOv8.hpp"
 #include <iostream>
@@ -52,13 +52,13 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
     int orig_w = frame.cols;
     int orig_h = frame.rows;
 
-    // --- PROPORTIONAL LETTERBOXING LOGIC ---
+    // --- PROPORTIONAL LETTERBOXING (RGB) ---
     // Calculate aspect-ratio preserving scale factor
     float scale = std::min(static_cast<float>(m_net_w) / orig_w, static_cast<float>(m_net_h) / orig_h);
     int new_w = static_cast<int>(std::round(orig_w * scale));
     int new_h = static_cast<int>(std::round(orig_h * scale));
 
-    // Calculate padding required to reach 640x640 canvas
+    // Calculate padding required to reach 640x640 canvas (140 pixels top/bottom for 16:9)
     int pad_w = (m_net_w - new_w) / 2;
     int pad_h = (m_net_h - new_h) / 2;
 
@@ -70,6 +70,7 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
     cv::Mat letterboxed(m_net_h, m_net_w, CV_8UC3, cv::Scalar(114, 114, 114));
     resized_frame.copyTo(letterboxed(cv::Rect(pad_w, pad_h, new_w, new_h)));
 
+    // Correct color blindness (Convert BGR to RGB)
     cv::Mat rgb_frame;
     cv::cvtColor(letterboxed, rgb_frame, cv::COLOR_BGR2RGB);
 
@@ -87,36 +88,52 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
             
             size_t output_size = m_output_buffer.size();
             float* raw_data = reinterpret_cast<float*>(m_output_buffer.data());
-            size_t num_detections = output_size / (6 * sizeof(float));
             
+            // Calculate how many maximum candidate boxes the NPU returns per class
+            size_t total_floats = output_size / sizeof(float);
+            size_t max_boxes_per_class = total_floats / (80 * 5); 
+
             std::vector<DetectionBox> temp_detections;
-            // Hailo NMS output structure: [ymin, xmin, ymax, xmax, conf, class_id]
-            for (size_t i = 0; i < num_detections; ++i) {
-                float conf = raw_data[i * 6 + 4];
-                int class_id = static_cast<int>(raw_data[i * 6 + 5]);
 
-                if (conf >= conf_threshold && class_id == 0) {
-                    // Convert normalized NPU outputs back to 640x640 canvas pixel coordinates
-                    float ymin_canvas = raw_data[i * 6 + 0] * m_net_h;
-                    float xmin_canvas = raw_data[i * 6 + 1] * m_net_w;
-                    float ymax_canvas = raw_data[i * 6 + 2] * m_net_h;
-                    float xmax_canvas = raw_data[i * 6 + 3] * m_net_w;
+            // Mirror the Python tensor extraction: [80 classes][max_boxes][5 attributes]
+            for (int cls_id = 0; cls_id < 80; ++cls_id) {
+                for (size_t d = 0; d < max_boxes_per_class; ++d) {
+        
+                    // Calculate the exact memory address for this specific detection
+                    size_t base_idx = (cls_id * max_boxes_per_class + d) * 5;
+                    
+                    float conf = raw_data[base_idx + 4];
 
-                    // Reverse padding offsets and unscale back to original 1024x576 frame space
-                    int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
-                    int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
-                    int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
-                    int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
+                    // Only process valid boxes for Class 0 (Person)
+                    if (conf >= conf_threshold && cls_id == 0) {
+                        
+                        float ymin_canvas = raw_data[base_idx + 0] * m_net_h;
+                        float xmin_canvas = raw_data[base_idx + 1] * m_net_w;
+                        float ymax_canvas = raw_data[base_idx + 2] * m_net_h;
+                        float xmax_canvas = raw_data[base_idx + 3] * m_net_w;
 
-                    // Clamp coordinates to original image bounds
-                    DetectionBox box;
-                    box.x1 = std::max(0, std::min(x1, orig_w - 1));
-                    box.y1 = std::max(0, std::min(y1, orig_h - 1));
-                    box.x2 = std::max(0, std::min(x2, orig_w - 1));
-                    box.y2 = std::max(0, std::min(y2, orig_h - 1));
-                    box.confidence = conf;
-                    box.class_id = class_id;
-                    temp_detections.push_back(box);
+                        // --- CENTROID MASKING FILTER ---
+                        float centroid_y = (ymin_canvas + ymax_canvas) / 2.0f;
+                        if (centroid_y <= pad_h || centroid_y >= (m_net_h - pad_h)) {
+                            continue; 
+                        }
+
+                        // Reverse padding offsets and unscale
+                        int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
+                        int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
+                        int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
+                        int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
+
+                        // Clamp coordinates to bounds
+                        DetectionBox box;
+                        box.x1 = std::max(0, std::min(x1, orig_w - 1));
+                        box.y1 = std::max(0, std::min(y1, orig_h - 1));
+                        box.x2 = std::max(0, std::min(x2, orig_w - 1));
+                        box.y2 = std::max(0, std::min(y2, orig_h - 1));
+                        box.confidence = conf;
+                        box.class_id = cls_id;
+                        temp_detections.push_back(box);
+                    }
                 }
             }
 

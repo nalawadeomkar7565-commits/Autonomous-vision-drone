@@ -1,4 +1,4 @@
-// Version: Rev.C
+// Version: Rev.D
 
 #ifndef HAILO_YOLOV8_HPP
 #define HAILO_YOLOV8_HPP
