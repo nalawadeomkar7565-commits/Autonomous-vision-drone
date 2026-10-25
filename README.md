@@ -23,7 +23,7 @@ The payload is built around a first-principles approach to hardware acceleration
 * **Vision Sensor:** IMX708 Wide Camera Module
 * **Streaming Protocol:** MediaMTX for low-latency RTSP video streaming
 
-![System Architecture Diagram](your-diagram-filename.png)
+![System Architecture Diagram](docs/TDP_System_Architechture_C001_Rev.B.png)
 
 ## Software Stack & Pipeline
 
@@ -44,7 +44,6 @@ Phase 1 focused on validating the C++ vision pipeline, NPU acceleration, and the
 * Verified RTSP stream latency bounds over MediaMTX.
 
 ![Desk Test Demo](your-demo-video-or-gif-filename.gif)
-*(If using a YouTube link instead of a GIF, replace the line above with: [Watch the Phase 1 Desk Test Demo](your-youtube-url))*
 
 ## Next Steps: Hardware Prototyping & Flight Integration
 
@@ -56,11 +55,22 @@ Phase 1 focused on validating the C++ vision pipeline, NPU acceleration, and the
 ## Repository Structure
 
 ```text
-├── docs/                     # Architecture diagrams and hardware specifications
-├── include/                  # C++ headers (e.g., HailoYOLOv8.hpp)
-├── prototype/                # Initial Python prototyping and HUD development scripts
+├── docs/
+│   ├── BOM/
+│   │   ├── BOM_C001_Rev.A_20_Sep_2026.xlsx             # Hardware bill of materials (Initial)
+│   │   └── BOM_VP_20_Sep_2026_For_AI_Audit.pdf         # AI payload component audit
+│   ├── Learnings/
+│   │   └── Multi Rate Control Systems Analysis.html    # Control systems & architecture notes
+│   ├── Machine Vision Requirements.pdf                 # Core vision system specifications
+│   ├── Power_consumption_flight_time_analysis.html     # Hardware iteration metrics
+│   ├── Requirement_Tracability_Matrix.html             # Systems engineering tracking
+│   └── TDP_System_Architechture_C001_Rev.B.png         # Hardware/Software architecture diagram
+├── include/
+│   └── HailoYOLOv8.hpp                                 # C++ header for NPU integration
+├── prototype/
+│   └── drone_hud.py                                    # Initial Python prototyping & HUD
 ├── src/
-│   ├── main.cpp              # Core application entry point
-│   ├── HailoYOLOv8.cpp       # HailoRT NPU pipeline and centroid masking logic
-├── CMakeLists.txt            # CMake build configuration for the edge payload
+│   ├── HailoYOLOv8.cpp                                 # HailoRT NPU pipeline & centroid logic
+│   └── main.cpp                                        # Core C++ application entry point
+├── CMakeLists.txt                                      # CMake build configuration for edge deployment
 └── README.md
