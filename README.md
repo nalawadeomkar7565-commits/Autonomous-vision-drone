@@ -43,7 +43,11 @@ Phase 1 focused on validating the C++ vision pipeline, NPU acceleration, and the
 * Achieved stable, real-time object tracking and centroidal masking.
 * Verified RTSP stream latency bounds over MediaMTX.
 
-![Desk Test Demo](your-demo-video-or-gif-filename.gif)
+**Hardware Demonstration & R&D Logs:**
+- 🎥 [Watch [Devlog 01] Phase 1 | Video 1: Hardware Integration & MediaMTX RTSP Network Latency Tuning](https://youtu.be/aKnSGq8s15E)
+- 🎥 [Watch [Devlog 02] Phase 1 | Video 2: YOLOv8s AI Tracking & RTSP Streaming Desk Test](https://youtu.be/ex9KbQO8K-Q)
+- 🎥 [Watch [Devlog 03] Phase 1 | Video 3: Multi-Target Dynamic Person Tracking](https://youtu.be/ML5pBg6UUCY)
+- 🎥 [Watch [Devlog 04] Phase 1 | Video 4: Debugging C++ Edge Vision Pipeline: False Positives & Letterbox Artifacts](https://youtu.be/Runy1ffQ1X0)
 
 ## Next Steps: Hardware Prototyping & Flight Integration
 
