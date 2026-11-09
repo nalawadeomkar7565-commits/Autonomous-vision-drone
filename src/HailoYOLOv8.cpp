@@ -1,9 +1,10 @@
-// Version: Rev.D
+// Version: Rev.E
 
 #include "HailoYOLOv8.hpp"
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 
 using namespace hailort;
 
@@ -89,51 +90,60 @@ void HailoYOLOv8::infer_async(const cv::Mat& frame, float conf_threshold) {
             size_t output_size = m_output_buffer.size();
             float* raw_data = reinterpret_cast<float*>(m_output_buffer.data());
             
-            // Calculate how many maximum candidate boxes the NPU returns per class
+            // Calculate exact memory geometry based on the verified tensor structure
             size_t total_floats = output_size / sizeof(float);
-            size_t max_boxes_per_class = total_floats / (80 * 5); 
+            size_t floats_per_class = total_floats / 80;
+            size_t max_boxes_per_class = (floats_per_class - 1) / 5;
 
             std::vector<DetectionBox> temp_detections;
 
-            // Mirror the Python tensor extraction: [80 classes][max_boxes][5 attributes]
-            for (int cls_id = 0; cls_id < 80; ++cls_id) {
-                for (size_t d = 0; d < max_boxes_per_class; ++d) {
-        
-                    // Calculate the exact memory address for this specific detection
-                    size_t base_idx = (cls_id * max_boxes_per_class + d) * 5;
-                    
-                    float conf = raw_data[base_idx + 4];
+            // Target Class 0 (Person) directly and ignore all other background objects
+            int target_class = 0;
+            size_t class_base = target_class * floats_per_class;
+            
+            // Index 0 of the bucket contains the explicit count of valid boxes
+            int num_valid_boxes = static_cast<int>(raw_data[class_base]);
+            
+            // Failsafe clamp to prevent buffer overflow
+            num_valid_boxes = std::min(num_valid_boxes, static_cast<int>(max_boxes_per_class));
 
-                    // Only process valid boxes for Class 0 (Person)
-                    if (conf >= conf_threshold && cls_id == 0) {
-                        
-                        float ymin_canvas = raw_data[base_idx + 0] * m_net_h;
-                        float xmin_canvas = raw_data[base_idx + 1] * m_net_w;
-                        float ymax_canvas = raw_data[base_idx + 2] * m_net_h;
-                        float xmax_canvas = raw_data[base_idx + 3] * m_net_w;
+            for (int d = 0; d < num_valid_boxes; ++d) {
+                // Skip the count float (+1), then step by 5 for each valid box
+                size_t box_base = class_base + 1 + (d * 5);
 
-                        // --- CENTROID MASKING FILTER ---
-                        float centroid_y = (ymin_canvas + ymax_canvas) / 2.0f;
-                        if (centroid_y <= pad_h || centroid_y >= (m_net_h - pad_h)) {
-                            continue; 
-                        }
+                float ymin_norm = raw_data[box_base + 0];
+                float xmin_norm = raw_data[box_base + 1];
+                float ymax_norm = raw_data[box_base + 2];
+                float xmax_norm = raw_data[box_base + 3];
+                float conf = raw_data[box_base + 4];
 
-                        // Reverse padding offsets and unscale
-                        int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
-                        int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
-                        int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
-                        int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
+                if (conf >= conf_threshold) {
+                    float ymin_canvas = ymin_norm * m_net_h;
+                    float xmin_canvas = xmin_norm * m_net_w;
+                    float ymax_canvas = ymax_norm * m_net_h;
+                    float xmax_canvas = xmax_norm * m_net_w;
 
-                        // Clamp coordinates to bounds
-                        DetectionBox box;
-                        box.x1 = std::max(0, std::min(x1, orig_w - 1));
-                        box.y1 = std::max(0, std::min(y1, orig_h - 1));
-                        box.x2 = std::max(0, std::min(x2, orig_w - 1));
-                        box.y2 = std::max(0, std::min(y2, orig_h - 1));
-                        box.confidence = conf;
-                        box.class_id = cls_id;
-                        temp_detections.push_back(box);
+                    // --- CENTROID MASKING FILTER ---
+                    float centroid_y = (ymin_canvas + ymax_canvas) / 2.0f;
+                    if (centroid_y <= pad_h || centroid_y >= (m_net_h - pad_h)) {
+                        continue; 
                     }
+
+                    // Reverse padding offsets and unscale
+                    int x1 = static_cast<int>(std::round((xmin_canvas - pad_w) / scale));
+                    int y1 = static_cast<int>(std::round((ymin_canvas - pad_h) / scale));
+                    int x2 = static_cast<int>(std::round((xmax_canvas - pad_w) / scale));
+                    int y2 = static_cast<int>(std::round((ymax_canvas - pad_h) / scale));
+
+                    // Clamp coordinates to video bounds
+                    DetectionBox box;
+                    box.x1 = std::max(0, std::min(x1, orig_w - 1));
+                    box.y1 = std::max(0, std::min(y1, orig_h - 1));
+                    box.x2 = std::max(0, std::min(x2, orig_w - 1));
+                    box.y2 = std::max(0, std::min(y2, orig_h - 1));
+                    box.confidence = conf;
+                    box.class_id = target_class;
+                    temp_detections.push_back(box);
                 }
             }
 

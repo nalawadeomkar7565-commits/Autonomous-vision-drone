@@ -60,7 +60,11 @@ int main() {
             
             // Append the counter to the display label
             std::string label = "Target " + std::to_string(target_counter) + ": " + std::to_string(box.confidence).substr(0, 4);
-            cv::putText(frame, label, cv::Point(box.x1, box.y1 - 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+            
+            // CLAMP LOGIC: Ensure text never renders off the top of the screen
+            int safe_text_y = std::max(15, box.y1 - 10);
+            
+            cv::putText(frame, label, cv::Point(box.x1, safe_text_y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
             
             target_counter++; // Increment for the next object found in this frame
         }
