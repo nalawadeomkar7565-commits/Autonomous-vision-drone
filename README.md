@@ -48,6 +48,7 @@ Phase 1 focused on validating the C++ vision pipeline, NPU acceleration, and the
 - 🎥 [Watch [Devlog 02] Phase 1 | Video 2: YOLOv8s AI Tracking & RTSP Streaming Desk Test](https://youtu.be/ex9KbQO8K-Q)
 - 🎥 [Watch [Devlog 03] Phase 1 | Video 3: Multi-Target Dynamic Person Tracking](https://youtu.be/ML5pBg6UUCY)
 - 🎥 [Watch [Devlog 04] Phase 1 | Video 4: Debugging C++ Edge Vision Pipeline: False Positives & Letterbox Artifacts](https://youtu.be/Runy1ffQ1X0)
+- 🎥 [Watch [Devlog 05] Phase 1 | Video 5: Debugging C++ Edge Vision Pipeline: Hailo NPU NMS memory alignment](https://youtu.be/VJZiXMgJDkA)
 
 ## Next Steps: Hardware Prototyping & Flight Integration
 
